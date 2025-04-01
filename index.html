@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streamgraph: Global Electric Vehicle Trends</title>
+
+    <!-- Load d3.js & color scale-->
+    <script src="https://d3js.org/d3.v4.js"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        h1, h2 {
+            font-size: 32px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        #my_dataviz {
+            width: 100%;
+            max-width: 960px;
+            height: 500px;
+            margin: auto;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.75);
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            pointer-events: none;
+            transition: opacity 0.2s ease-in-out;
+            opacity: 0;
+            z-index: 10;
+        }
+
+        .footer {
+            font-size: 14px;
+            margin-top: 30px;
+            text-align: center;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Global Electric Vehicle Trends</h1>
+    <h2>Insights from the Global EV Outlook 2024</h2>
+    
+    <div id="my_dataviz"></div>
+    
+    <div id="tooltip" class="tooltip"></div>
+    
+    <div class="footer">
+        Data Source: <a href="https://www.iea.org/reports/global-ev-outlook-2024/trends-in-electric-cars" target="_blank">IEA Global EV Outlook 2024</a><br>
+        This visual is part of the <strong>#MakeoverMonday</strong> challenge.
+    </div>
+
+    <script>
+        // Set dimensions and margins of the graph
+        var margin = {top: 20, right: 30, bottom: 50, left: 40},
+            width = window.innerWidth * 0.8 - margin.left - margin.right,
+            height = 500 - margin.top - margin.bottom;
+
+        // Append SVG to the div container
+        var svg = d3.select("#my_dataviz")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+        // Parse the CSV data
+        d3.csv("import.csv", function(data) {
+            
+            // List of keys = headers of the CSV excluding the year
+            var keys = data.columns.slice(1);
+
+            // Set up X and Y scales
+            var x = d3.scaleLinear()
+                .domain(d3.extent(data, function(d) { return d.year; }))
+                .range([0, width]);
+
+            var y = d3.scaleLinear()
+                .domain([-100000, 100000])
+                .range([height, 0]);
+
+            // Create a color scale for different regions
+            var color = d3.scaleOrdinal()
+                .domain(keys)
+                .range(d3.schemeSet2);
+
+            // Stack the data
+            var stackedData = d3.stack()
+                .offset(d3.stackOffsetSilhouette)
+                .keys(keys)(data);
+
+            // Create the area generator
+            var area = d3.area()
+                .x(function(d) { return x(d.data.year); })
+                .y0(function(d) { return y(d[0]); })
+                .y1(function(d) { return y(d[1]); });
+
+            // Create tooltip
+            var tooltip = d3.select("#tooltip");
+
+            // Functions for tooltip and highlighting
+            var mouseover = function(d, i) {
+                tooltip.style("opacity", 1);
+                d3.selectAll(".myArea").style("opacity", 0.3);
+                d3.select(this)
+                    .style("stroke", "black")
+                    .style("opacity", 1);
+            }
+
+            var mousemove = function(d, i) {
+                tooltip.text(d.key + ": " + d3.format(",.0f")(d3.sum(d, function(d) { return d[1] - d[0]; })))
+                    .style("left", (d3.event.pageX + 10) + "px")
+                    .style("top", (d3.event.pageY - 25) + "px");
+            }
+
+            var mouseleave = function() {
+                tooltip.style("opacity", 0);
+                d3.selectAll(".myArea").style("opacity", 1).style("stroke", "none");
+            }
+
+            // Draw the stacked areas
+            svg.selectAll("mylayers")
+                .data(stackedData)
+                .enter()
+                .append("path")
+                .attr("class", "myArea")
+                .style("fill", function(d) { return color(d.key); })
+                .attr("d", area)
+                .on("mouseover", mouseover)
+                .on("mousemove", mousemove)
+                .on("mouseleave", mouseleave);
+
+            // Add X Axis
+            svg.append("g")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(x).tickSize(-height))
+                .select(".domain").remove();
+
+            // Add X Axis label
+            svg.append("text")
+                .attr("x", width)
+                .attr("y", height - 10)
+                .style("text-anchor", "end")
+                .text("Year");
+
+            // Add Y Axis
+            svg.append("g")
+                .call(d3.axisLeft(y).ticks(5));
+
+            // Add Y Axis label
+            svg.append("text")
+                .attr("x", 10)
+                .attr("y", 10)
+                .style("text-anchor", "start")
+                .text("Value");
+
+        });
+    </script>
+
+</body>
+</html>
